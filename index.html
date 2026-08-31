@@ -192,6 +192,29 @@
       return { color: label === "routes_to" ? t.routeColor : t.edgeColor, opacity: 0.7 };
     }
 
+    const defaultPhysics = {
+      enabled: true,
+      barnesHut: {
+        gravitationalConstant: -12000,
+        springLength: 140,
+        springConstant: 0.03,
+        damping: 0.25,
+        avoidOverlap: 0.4
+      },
+      stabilization: { iterations: 150 }
+    };
+
+    const discoveryPhysics = {
+      enabled: true,
+      barnesHut: {
+        gravitationalConstant: -8000,
+        springLength: 200,
+        springConstant: 0.006,
+        damping: 0.55,
+        avoidOverlap: 0.4
+      }
+    };
+
     let nodes, edges, network;
 
     async function loadGraph() {
@@ -209,7 +232,7 @@
           label: n.label,
           assetType: n.group,
           shape: "dot",
-          size: 16,
+          size: 26,
           color: nodeColorFor(n.group),
           font: { color: themeColors[currentTheme].nodeFont, size: 12 }
         })));
@@ -227,17 +250,7 @@
 
         const container = document.getElementById("graph");
         network = new vis.Network(container, { nodes, edges }, {
-          physics: {
-            enabled: true,
-            barnesHut: {
-              gravitationalConstant: -12000,
-              springLength: 140,
-              springConstant: 0.03,
-              damping: 0.25,
-              avoidOverlap: 0.4
-            },
-            stabilization: { iterations: 150 }
-          },
+          physics: defaultPhysics,
           interaction: { hover: true, tooltipDelay: 100 },
           nodes: { borderWidth: 2, chosen: false },
           edges: { width: 1.5, chosen: false }
@@ -325,7 +338,7 @@
             label: data.node.label,
             assetType: data.node.group,
             shape: "dot",
-            size: 16,
+            size: 26,
             color: nodeColorFor(data.node.group),
             font: { color: themeColors[currentTheme].nodeFont, size: 12 }
           });
@@ -339,7 +352,10 @@
             color: edgeColorFor(data.edge.label),
             smooth: { type: "continuous" }
           });
-          network.stabilize();
+          network.setOptions({ physics: discoveryPhysics });
+          setTimeout(() => {
+            network.setOptions({ physics: defaultPhysics });
+          }, 4500);
           discoverBtn.textContent = "Remove Discovered Asset";
         } else if (data.action === "removed") {
           nodes.remove(data.nodeId);
