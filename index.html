@@ -418,10 +418,11 @@
         const conflictLines = run.conflicts.map(c =>
           `• ${c.asset} — ${c.field}: ${c.detail} → resolved "${c.resolved}"`
         ).join("<br>");
+        const retiredPart = run.retiredAssetCount ? `, −${run.retiredAssetCount} retired` : "";
         return `
           <div class="logRun">
             <div class="logTime">${time} · ${run.mode === "agentic" ? "agentic" : "non-agentic"}</div>
-            <div class="logCounts">+${run.newAssetCount} new, ${run.updatedAssetCount} updated, ${run.conflictCount} conflicts resolved</div>
+            <div class="logCounts">+${run.newAssetCount} new${retiredPart}, ${run.updatedAssetCount} updated, ${run.conflictCount} conflicts resolved</div>
             <div class="logConflict">${conflictLines}</div>
           </div>`;
       }).join("");
@@ -456,9 +457,9 @@
             label: n.label,
             assetType: n.group,
             shape: "dot",
-            size: 26,
+            size: 46,
             color: nodeColorFor(n.group),
-            font: { color: themeColors[currentTheme].nodeFont, size: 12 }
+            font: { color: themeColors[currentTheme].nodeFont, size: 13, bold: true }
           });
         });
         data.newEdges.forEach(e => {
@@ -478,7 +479,29 @@
           network.setOptions({ physics: discoveryPhysics });
           setTimeout(() => {
             network.setOptions({ physics: defaultPhysics });
+            nodes.update(data.newNodes.map(n => ({
+              id: n.id,
+              size: 26,
+              font: { color: themeColors[currentTheme].nodeFont, size: 12, bold: false }
+            })));
           }, 4500);
+        }
+
+        if (data.retiredNodeIds && data.retiredNodeIds.length > 0) {
+          const stillPresent = data.retiredNodeIds.filter(id => nodes.get(id));
+          nodes.update(stillPresent.map(id => ({
+            id,
+            color: { background: "#ff5f56", border: "#c0392b", highlight: { background: "#ff5f56", border: "#ffffff" } },
+            size: 34
+          })));
+          setTimeout(() => {
+            const connectedEdgeIds = edges.getIds().filter(eid => {
+              const e = edges.get(eid);
+              return stillPresent.includes(e.from) || stillPresent.includes(e.to);
+            });
+            edges.remove(connectedEdgeIds);
+            nodes.remove(stillPresent);
+          }, 1400);
         }
 
         await loadLog();

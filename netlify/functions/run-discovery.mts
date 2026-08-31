@@ -38,18 +38,39 @@ export default async (req: Request, context: Context) => {
     );
     const existingNames = new Set(existingCheck.records.map(r => r.get("name")));
     const undiscovered = CANDIDATE_POOL.filter(c => !existingNames.has(c.name));
-
-    const newCount = Math.min(undiscovered.length, 1 + Math.floor(Math.random() * 3));
-    const toDiscover = pickRandom(undiscovered, newCount);
+    const currentlyDiscovered = CANDIDATE_POOL.filter(c => existingNames.has(c.name));
 
     const conflicts: any[] = [];
     const newAssetNames: string[] = [];
     const updatedAssetNames: string[] = [];
     const newNodesForClient: any[] = [];
     const newEdgesForClient: any[] = [];
+    const retiredAssetNames: string[] = [];
+    const retiredNodeIds: string[] = [];
 
     const now = Date.now();
     const lastSeen = new Date(now).toISOString();
+
+    if (currentlyDiscovered.length > 0 && Math.random() < 0.4) {
+      const toRetire = pickRandom(currentlyDiscovered, 1)[0];
+      const retireLookup = await session.run(`MATCH (n {name: $name}) RETURN id(n) AS id`, { name: toRetire.name });
+      if (retireLookup.records.length > 0) {
+        const nodeId = retireLookup.records[0].get("id").toString();
+        await session.run(`MATCH (n {name: $name}) DETACH DELETE n`, { name: toRetire.name });
+        retiredAssetNames.push(toRetire.name);
+        retiredNodeIds.push(nodeId);
+        conflicts.push({
+          asset: toRetire.name,
+          field: "lifecycle",
+          rule: "retired",
+          detail: `No source reported this asset in the current discovery cycle`,
+          resolved: "retired / removed from CMDB"
+        });
+      }
+    }
+
+    const newCount = Math.min(undiscovered.length, 1 + Math.floor(Math.random() * 3));
+    const toDiscover = pickRandom(undiscovered, newCount);
 
     for (const candidate of toDiscover) {
       const [sourceA, sourceB] = pickRandom(SOURCES, 2);
@@ -150,12 +171,13 @@ export default async (req: Request, context: Context) => {
     }
 
     const runId = "run-" + now;
-    if (newAssetNames.length === 0 && updatedAssetNames.length === 0) {
+    if (newAssetNames.length === 0 && updatedAssetNames.length === 0 && retiredAssetNames.length === 0) {
       return new Response(JSON.stringify({
         runId: null,
         newNodes: [],
         newEdges: [],
-        summary: { ranAt: lastSeen, newCount: 0, updatedCount: 0, conflictCount: 0, conflicts: [], noOp: true }
+        retiredNodeIds: [],
+        summary: { ranAt: lastSeen, newCount: 0, updatedCount: 0, retiredCount: 0, conflictCount: 0, conflicts: [], noOp: true }
       }), { headers: { "Content-Type": "application/json" } });
     }
 
@@ -163,14 +185,15 @@ export default async (req: Request, context: Context) => {
       `CREATE (r:DiscoveryRun {
         runId: $runId, ranAt: $ranAt, mode: "non_agentic",
         sourcesConsulted: $sources, newAssetCount: $newCount,
-        updatedAssetCount: $updatedCount, conflictCount: $conflictCount,
-        conflictsJson: $conflictsJson, newAssetNames: $newAssetNames, updatedAssetNames: $updatedAssetNames
+        updatedAssetCount: $updatedCount, retiredAssetCount: $retiredCount,
+        conflictCount: $conflictCount, conflictsJson: $conflictsJson,
+        newAssetNames: $newAssetNames, updatedAssetNames: $updatedAssetNames, retiredAssetNames: $retiredAssetNames
       })`,
       {
         runId, ranAt: lastSeen, sources: SOURCES,
-        newCount: newAssetNames.length, updatedCount: updatedAssetNames.length,
+        newCount: newAssetNames.length, updatedCount: updatedAssetNames.length, retiredCount: retiredAssetNames.length,
         conflictCount: conflicts.length, conflictsJson: JSON.stringify(conflicts),
-        newAssetNames, updatedAssetNames
+        newAssetNames, updatedAssetNames, retiredAssetNames
       }
     );
 
@@ -178,10 +201,12 @@ export default async (req: Request, context: Context) => {
       runId,
       newNodes: newNodesForClient,
       newEdges: newEdgesForClient,
+      retiredNodeIds,
       summary: {
         ranAt: lastSeen,
         newCount: newAssetNames.length,
         updatedCount: updatedAssetNames.length,
+        retiredCount: retiredAssetNames.length,
         conflictCount: conflicts.length,
         conflicts
       }

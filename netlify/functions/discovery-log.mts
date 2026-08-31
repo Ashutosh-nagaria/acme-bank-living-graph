@@ -30,6 +30,7 @@ export default async (req: Request, context: Context) => {
         sourcesConsulted: p.sourcesConsulted,
         newAssetCount: neo4j.isInt(p.newAssetCount) ? p.newAssetCount.toNumber() : p.newAssetCount,
         updatedAssetCount: neo4j.isInt(p.updatedAssetCount) ? p.updatedAssetCount.toNumber() : p.updatedAssetCount,
+        retiredAssetCount: neo4j.isInt(p.retiredAssetCount) ? p.retiredAssetCount.toNumber() : (p.retiredAssetCount || 0),
         conflictCount: neo4j.isInt(p.conflictCount) ? p.conflictCount.toNumber() : p.conflictCount,
         conflicts: JSON.parse(p.conflictsJson || "[]"),
         newAssetNames: p.newAssetNames || [],
