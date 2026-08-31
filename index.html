@@ -13,6 +13,13 @@
     --text: #e6edf3;
     --muted: #8b98a5;
   }
+  html[data-theme="light"] {
+    --bg: #f5f7fa;
+    --panel: #ffffff;
+    --border: #d7dee5;
+    --text: #1a2027;
+    --muted: #5b6b78;
+  }
   * { box-sizing: border-box; }
   body {
     margin: 0;
@@ -28,6 +35,7 @@
     display: flex;
     align-items: baseline;
     gap: 12px;
+    position: relative;
   }
   header h1 {
     font-size: 18px;
@@ -86,18 +94,19 @@
   }
   #discoverBtn {
     position: absolute;
-    bottom: 24px;
-    right: 24px;
+    top: 50%;
+    right: 28px;
+    transform: translateY(-50%);
     z-index: 10;
     background: #4f8cff;
     color: #fff;
     border: none;
-    border-radius: 8px;
-    padding: 10px 18px;
-    font-size: 13px;
+    border-radius: 10px;
+    padding: 16px 26px;
+    font-size: 15px;
     font-weight: 600;
     cursor: pointer;
-    box-shadow: 0 2px 12px rgba(79, 140, 255, 0.35);
+    box-shadow: 0 4px 18px rgba(79, 140, 255, 0.4);
   }
   #discoverBtn:hover {
     background: #3d7ae8;
@@ -106,12 +115,26 @@
     opacity: 0.5;
     cursor: default;
   }
+  #themeToggle {
+    position: absolute;
+    right: 24px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 13px;
+    cursor: pointer;
+  }
 </style>
 </head>
 <body>
   <header>
     <h1>Acme Bank — Living Infrastructure Graph</h1>
     <span>Discovery / CMDB visualization</span>
+    <button id="themeToggle">🌙 Dark</button>
   </header>
   <div id="graph"></div>
   <div id="status">Loading graph...</div>
@@ -139,12 +162,35 @@
       Storage: "#a06fd1"
     };
 
-    const edgeStyle = {
-      depends_on: { dashes: false, color: "#5b6b78" },
-      connects_to: { dashes: [4, 4], color: "#5b6b78" },
-      routes_to: { dashes: false, color: "#c98a3e" },
-      inherits_from: { dashes: [1, 4], color: "#5b6b78" }
+    const edgeDash = {
+      depends_on: false,
+      connects_to: [4, 4],
+      routes_to: false,
+      inherits_from: [1, 4]
     };
+
+    const themeColors = {
+      dark: { nodeBorder: "#0b0f14", nodeFont: "#e6edf3", edgeColor: "#5b6b78", routeColor: "#c98a3e" },
+      light: { nodeBorder: "#f5f7fa", nodeFont: "#1a2027", edgeColor: "#94a3b8", routeColor: "#c98a3e" }
+    };
+
+    let currentTheme = localStorage.getItem("acme-graph-theme") || "dark";
+    document.documentElement.setAttribute("data-theme", currentTheme);
+
+    function nodeColorFor(group) {
+      const t = themeColors[currentTheme];
+      const bg = groupColors[group] || "#666";
+      return {
+        background: bg,
+        border: t.nodeBorder,
+        highlight: { background: bg, border: "#ffffff" }
+      };
+    }
+
+    function edgeColorFor(label) {
+      const t = themeColors[currentTheme];
+      return { color: label === "routes_to" ? t.routeColor : t.edgeColor, opacity: 0.7 };
+    }
 
     let nodes, edges, network;
 
@@ -163,26 +209,19 @@
           label: n.label,
           shape: "dot",
           size: 16,
-          color: {
-            background: groupColors[n.group] || "#666",
-            border: "#0b0f14",
-            highlight: { background: groupColors[n.group] || "#666", border: "#fff" }
-          },
-          font: { color: "#e6edf3", size: 12 }
+          color: nodeColorFor(n.group),
+          font: { color: themeColors[currentTheme].nodeFont, size: 12 }
         })));
 
-        edges = new vis.DataSet(data.edges.map(e => {
-          const style = edgeStyle[e.label] || { dashes: false, color: "#5b6b78" };
-          return {
-            id: e.id,
-            from: e.from,
-            to: e.to,
-            arrows: "to",
-            dashes: style.dashes,
-            color: { color: style.color, opacity: 0.7 },
-            smooth: { type: "continuous" }
-          };
-        }));
+        edges = new vis.DataSet(data.edges.map(e => ({
+          id: e.id,
+          from: e.from,
+          to: e.to,
+          arrows: "to",
+          dashes: edgeDash[e.label] ?? false,
+          color: edgeColorFor(e.label),
+          smooth: { type: "continuous" }
+        })));
 
         const container = document.getElementById("graph");
         network = new vis.Network(container, { nodes, edges }, {
@@ -226,21 +265,16 @@
             label: data.node.label,
             shape: "dot",
             size: 16,
-            color: {
-              background: groupColors[data.node.group] || "#666",
-              border: "#0b0f14",
-              highlight: { background: groupColors[data.node.group] || "#666", border: "#fff" }
-            },
-            font: { color: "#e6edf3", size: 12 }
+            color: nodeColorFor(data.node.group),
+            font: { color: themeColors[currentTheme].nodeFont, size: 12 }
           });
-          const style = edgeStyle[data.edge.label] || { dashes: false, color: "#5b6b78" };
           edges.add({
             id: data.edge.id,
             from: data.edge.from,
             to: data.edge.to,
             arrows: "to",
-            dashes: style.dashes,
-            color: { color: style.color, opacity: 0.7 },
+            dashes: edgeDash[data.edge.label] ?? false,
+            color: edgeColorFor(data.edge.label),
             smooth: { type: "continuous" }
           });
           network.stabilize();
@@ -254,6 +288,37 @@
         alert("Discovery action failed: " + err.message);
       } finally {
         discoverBtn.disabled = false;
+      }
+    });
+    const themeToggle = document.getElementById("themeToggle");
+    themeToggle.textContent = currentTheme === "dark" ? "☀️ Light" : "🌙 Dark";
+    themeToggle.addEventListener("click", () => {
+      currentTheme = currentTheme === "dark" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", currentTheme);
+      localStorage.setItem("acme-graph-theme", currentTheme);
+      themeToggle.textContent = currentTheme === "dark" ? "☀️ Light" : "🌙 Dark";
+
+      if (nodes && edges) {
+        const nodeUpdates = nodes.getIds().map(id => {
+          const n = nodes.get(id);
+          return {
+            id,
+            color: nodeColorFor(n.color.background === groupColors.Application ? "Application"
+              : n.color.background === groupColors.Database ? "Database"
+              : n.color.background === groupColors.LoadBalancer ? "LoadBalancer"
+              : n.color.background === groupColors.Server ? "Server"
+              : "Storage"),
+            font: { color: themeColors[currentTheme].nodeFont, size: 12 }
+          };
+        });
+        nodes.update(nodeUpdates);
+
+        const edgeUpdates = edges.getIds().map(id => {
+          const e = edges.get(id);
+          const isRoute = Array.isArray(e.dashes) ? false : (e.color && e.color.color === themeColors.dark.routeColor);
+          return { id, color: { color: isRoute ? themeColors[currentTheme].routeColor : themeColors[currentTheme].edgeColor, opacity: 0.7 } };
+        });
+        edges.update(edgeUpdates);
       }
     });
   </script>
