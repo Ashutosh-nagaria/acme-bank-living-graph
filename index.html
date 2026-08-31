@@ -94,7 +94,7 @@
   }
   #discoverBtn {
     position: absolute;
-    top: 50%;
+    top: 42%;
     right: 28px;
     transform: translateY(-50%);
     z-index: 10;
@@ -112,6 +112,29 @@
     background: #3d7ae8;
   }
   #discoverBtn:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  #agenticBtn {
+    position: absolute;
+    top: 58%;
+    right: 28px;
+    transform: translateY(-50%);
+    z-index: 10;
+    background: #a06fd1;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 16px 26px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 18px rgba(160, 111, 209, 0.4);
+  }
+  #agenticBtn:hover {
+    background: #8c58c0;
+  }
+  #agenticBtn:disabled {
     opacity: 0.5;
     cursor: default;
   }
@@ -182,6 +205,7 @@
   <div id="graph"></div>
   <div id="status">Loading graph...</div>
   <button id="discoverBtn">Run Discovery</button>
+  <button id="agenticBtn">Run Discovery (Agentic)</button>
   <div id="logPanel">
     <div class="section-title">Discovery Log</div>
     <div id="logEntries">No runs yet</div>
@@ -403,14 +427,14 @@
     loadGraph();
     loadLog();
 
-    const discoverBtn = document.getElementById("discoverBtn");
-    discoverBtn.addEventListener("click", async () => {
-      discoverBtn.disabled = true;
-      discoverBtn.textContent = "Running discovery...";
+    async function runDiscovery(endpoint, button, runningLabel, idleLabel) {
+      button.disabled = true;
+      button.textContent = runningLabel;
       try {
-        const res = await fetch("/api/run-discovery");
+        const res = await fetch(endpoint);
         if (!res.ok) throw new Error("Request failed: " + res.status);
         const data = await res.json();
+        if (data.error) throw new Error(data.error);
 
         data.newNodes.forEach(n => {
           nodes.add({
@@ -448,9 +472,19 @@
         console.error(err);
         alert("Discovery run failed: " + err.message);
       } finally {
-        discoverBtn.disabled = false;
-        discoverBtn.textContent = "Run Discovery";
+        button.disabled = false;
+        button.textContent = idleLabel;
       }
+    }
+
+    const discoverBtn = document.getElementById("discoverBtn");
+    discoverBtn.addEventListener("click", () => {
+      runDiscovery("/api/run-discovery", discoverBtn, "Running discovery...", "Run Discovery");
+    });
+
+    const agenticBtn = document.getElementById("agenticBtn");
+    agenticBtn.addEventListener("click", () => {
+      runDiscovery("/api/run-discovery-agentic", agenticBtn, "Asking Claude...", "Run Discovery (Agentic)");
     });
     const themeToggle = document.getElementById("themeToggle");
     themeToggle.textContent = currentTheme === "dark" ? "☀️ Light" : "🌙 Dark";
