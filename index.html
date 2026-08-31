@@ -207,7 +207,7 @@
         nodes = new vis.DataSet(data.nodes.map(n => ({
           id: n.id,
           label: n.label,
-          group: n.group,
+          assetType: n.group,
           shape: "dot",
           size: 16,
           color: nodeColorFor(n.group),
@@ -323,7 +323,7 @@
           nodes.add({
             id: data.node.id,
             label: data.node.label,
-            group: data.node.group,
+            assetType: data.node.group,
             shape: "dot",
             size: 16,
             color: nodeColorFor(data.node.group),
@@ -365,7 +365,7 @@
           const n = nodes.get(id);
           return {
             id,
-            color: nodeColorFor(n.group),
+            color: nodeColorFor(n.assetType),
             font: { color: themeColors[currentTheme].nodeFont, size: 12 }
           };
         });
