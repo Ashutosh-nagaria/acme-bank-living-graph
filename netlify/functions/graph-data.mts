@@ -7,7 +7,12 @@ export default async (req: Request, context: Context) => {
   const password = Netlify.env.get("NEO4J_PASSWORD");
 
   if (!uri || !username || !password) {
-    return new Response(JSON.stringify({ error: "Missing Neo4j credentials in environment variables" }), {
+    return new Response(JSON.stringify({
+      error: "Missing Neo4j credentials in environment variables",
+      uriPresent: Boolean(uri),
+      usernamePresent: Boolean(username),
+      passwordPresent: Boolean(password)
+    }), {
       status: 500,
       headers: { "Content-Type": "application/json" }
     });
