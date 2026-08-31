@@ -25,7 +25,7 @@ export default async (req: Request, context: Context) => {
   const uri = Netlify.env.get("NEO4J_URI");
   const username = Netlify.env.get("NEO4J_USERNAME");
   const password = Netlify.env.get("NEO4J_PASSWORD");
-  const apiKey = Netlify.env.get("ANTHROPIC_API_KEY");
+  const apiKey = Netlify.env.get("DEEPSEEK_API_KEY");
 
   if (!uri || !username || !password) {
     return new Response(JSON.stringify({ error: "Missing Neo4j credentials" }), {
@@ -33,7 +33,7 @@ export default async (req: Request, context: Context) => {
     });
   }
   if (!apiKey) {
-    return new Response(JSON.stringify({ error: "Missing ANTHROPIC_API_KEY" }), {
+    return new Response(JSON.stringify({ error: "Missing DEEPSEEK_API_KEY" }), {
       status: 500, headers: { "Content-Type": "application/json" }
     });
   }
@@ -99,28 +99,28 @@ export default async (req: Request, context: Context) => {
     if (rawConflicts.length > 0) {
       const systemPrompt = `You are a CMDB reconciliation engine. You are given conflicting reports about IT infrastructure assets from two independent discovery sources. For each conflict, decide which source's value to trust and give a one-sentence reasoning grounded only in the evidence given (timestamps, which value is present vs missing, or general judgment about source reliability for that field). A null value means that source did not report anything for that field. Respond with ONLY a JSON array, no markdown formatting, no prose outside the array, in exactly this shape: [{"asset": string, "field": string, "trustedSource": string, "resolvedValue": string, "reasoning": string}]`;
 
-      const apiResponse = await fetch("https://api.anthropic.com/v1/messages", {
+      const apiResponse = await fetch("https://api.deepseek.com/chat/completions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01"
+          "Authorization": `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-          model: "claude-haiku-4-5-20251001",
-          max_tokens: 2000,
-          system: systemPrompt,
-          messages: [{ role: "user", content: JSON.stringify(rawConflicts) }]
+          model: "deepseek-chat",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: JSON.stringify(rawConflicts) }
+          ]
         })
       });
 
       if (!apiResponse.ok) {
         const errText = await apiResponse.text();
-        throw new Error(`Anthropic API error: ${apiResponse.status} ${errText}`);
+        throw new Error(`DeepSeek API error: ${apiResponse.status} ${errText}`);
       }
 
       const apiData = await apiResponse.json();
-      const text = (apiData.content || []).map((b: any) => b.text || "").join("");
+      const text = apiData.choices?.[0]?.message?.content || "";
       const cleaned = text.replace(/```json|```/g, "").trim();
       decisions = JSON.parse(cleaned);
     }
@@ -146,7 +146,7 @@ export default async (req: Request, context: Context) => {
         asset: candidate.name,
         field: raw.field,
         rule: "agentic-judgment",
-        detail: `${raw.sourceA.name} reported "${raw.sourceA.value ?? "nothing"}", ${raw.sourceB.name} reported "${raw.sourceB.value ?? "nothing"}". Claude trusted ${trustedSource}: ${reasoning}`,
+        detail: `${raw.sourceA.name} reported "${raw.sourceA.value ?? "nothing"}", ${raw.sourceB.name} reported "${raw.sourceB.value ?? "nothing"}". The model trusted ${trustedSource}: ${reasoning}`,
         resolved: resolvedValue
       });
       newAssetNames.push(candidate.name);
@@ -193,7 +193,7 @@ export default async (req: Request, context: Context) => {
         asset: asset.name,
         field: "last_patched",
         rule: "agentic-judgment",
-        detail: `${raw.sourceA.name} reported "${raw.sourceA.value ?? "nothing"}", ${raw.sourceB.name} reported "${raw.sourceB.value ?? "nothing"}". Claude trusted ${trustedSource}: ${reasoning}`,
+        detail: `${raw.sourceA.name} reported "${raw.sourceA.value ?? "nothing"}", ${raw.sourceB.name} reported "${raw.sourceB.value ?? "nothing"}". The model trusted ${trustedSource}: ${reasoning}`,
         resolved: resolvedValue
       });
       updatedAssetNames.push(asset.name);
