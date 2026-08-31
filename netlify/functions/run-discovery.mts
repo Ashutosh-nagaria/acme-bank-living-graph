@@ -150,6 +150,15 @@ export default async (req: Request, context: Context) => {
     }
 
     const runId = "run-" + now;
+    if (newAssetNames.length === 0 && updatedAssetNames.length === 0) {
+      return new Response(JSON.stringify({
+        runId: null,
+        newNodes: [],
+        newEdges: [],
+        summary: { ranAt: lastSeen, newCount: 0, updatedCount: 0, conflictCount: 0, conflicts: [], noOp: true }
+      }), { headers: { "Content-Type": "application/json" } });
+    }
+
     await session.run(
       `CREATE (r:DiscoveryRun {
         runId: $runId, ranAt: $ranAt, mode: "non_agentic",
