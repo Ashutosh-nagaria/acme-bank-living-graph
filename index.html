@@ -239,8 +239,8 @@
             stabilization: { iterations: 150 }
           },
           interaction: { hover: true, tooltipDelay: 100 },
-          nodes: { borderWidth: 2 },
-          edges: { width: 1.5 }
+          nodes: { borderWidth: 2, chosen: false },
+          edges: { width: 1.5, chosen: false }
         });
 
         network.on("click", params => {
