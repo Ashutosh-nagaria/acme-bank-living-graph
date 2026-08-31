@@ -28,14 +28,22 @@
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     height: 100vh;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
   }
   header {
     padding: 16px 24px;
     border-bottom: 1px solid var(--border);
     display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+  .headerTitle {
+    display: flex;
     align-items: baseline;
     gap: 12px;
-    position: relative;
   }
   header h1 {
     font-size: 18px;
@@ -46,9 +54,19 @@
     color: var(--muted);
     font-size: 13px;
   }
+  .main {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+  }
+  #graphArea {
+    flex: 1;
+    position: relative;
+    min-width: 0;
+  }
   #graph {
     width: 100%;
-    height: calc(100vh - 61px);
+    height: 100%;
   }
   #legend {
     position: absolute;
@@ -86,95 +104,81 @@
   }
   #status {
     position: absolute;
-    top: 72px;
-    right: 24px;
+    top: 16px;
+    left: 24px;
     font-size: 12px;
     color: var(--muted);
     z-index: 10;
   }
-  #discoverBtn {
-    position: absolute;
-    top: 42%;
-    right: 28px;
-    transform: translateY(-50%);
-    z-index: 10;
-    background: #4f8cff;
+  #sidebar {
+    width: 380px;
+    flex-shrink: 0;
+    border-left: 1px solid var(--border);
+    background: var(--panel);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  #sidebarButtons {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  #discoverBtn, #agenticBtn {
+    width: 100%;
     color: #fff;
     border: none;
     border-radius: 10px;
-    padding: 16px 26px;
-    font-size: 15px;
+    padding: 14px 20px;
+    font-size: 14px;
     font-weight: 600;
     cursor: pointer;
-    box-shadow: 0 4px 18px rgba(79, 140, 255, 0.4);
+  }
+  #discoverBtn {
+    background: #4f8cff;
   }
   #discoverBtn:hover {
     background: #3d7ae8;
   }
-  #discoverBtn:disabled {
-    opacity: 0.5;
-    cursor: default;
-  }
   #agenticBtn {
-    position: absolute;
-    top: 58%;
-    right: 28px;
-    transform: translateY(-50%);
-    z-index: 10;
     background: #a06fd1;
-    color: #fff;
-    border: none;
-    border-radius: 10px;
-    padding: 16px 26px;
-    font-size: 15px;
-    font-weight: 600;
-    cursor: pointer;
-    box-shadow: 0 4px 18px rgba(160, 111, 209, 0.4);
   }
   #agenticBtn:hover {
     background: #8c58c0;
   }
-  #agenticBtn:disabled {
+  #discoverBtn:disabled, #agenticBtn:disabled {
     opacity: 0.5;
     cursor: default;
   }
   #themeToggle {
-    position: absolute;
-    right: 24px;
-    top: 50%;
-    transform: translateY(-50%);
-    background: var(--panel);
+    background: var(--bg);
     border: 1px solid var(--border);
     color: var(--text);
     border-radius: 8px;
     padding: 8px 14px;
     font-size: 13px;
     cursor: pointer;
+    flex-shrink: 0;
   }
   #logPanel {
-    position: absolute;
-    top: 84px;
-    right: 24px;
-    width: 340px;
-    max-height: 42vh;
+    flex: 1;
     overflow-y: auto;
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 14px 16px;
+    padding: 20px;
     font-size: 12px;
-    z-index: 10;
   }
   #logPanel .section-title {
     color: var(--muted);
     font-size: 10px;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    margin-bottom: 8px;
+    margin-bottom: 12px;
   }
   .logRun {
     border-top: 1px solid var(--border);
-    padding: 8px 0;
+    padding: 10px 0;
   }
   .logRun:first-child {
     border-top: none;
@@ -198,30 +202,40 @@
 </head>
 <body>
   <header>
-    <h1>Acme Bank — Living Infrastructure Graph</h1>
-    <span>Discovery / CMDB visualization</span>
+    <div class="headerTitle">
+      <h1>Acme Bank — Living Infrastructure Graph</h1>
+      <span>Discovery / CMDB visualization</span>
+    </div>
     <button id="themeToggle">🌙 Dark</button>
   </header>
-  <div id="graph"></div>
-  <div id="status">Loading graph...</div>
-  <button id="discoverBtn">Run Discovery</button>
-  <button id="agenticBtn">Run Discovery (Agentic)</button>
-  <div id="logPanel">
-    <div class="section-title">Discovery Log</div>
-    <div id="logEntries">No runs yet</div>
-  </div>
-  <div id="legend">
-    <div class="section-title">Node type</div>
-    <div><span class="dot" style="background:#4f8cff"></span>Application</div>
-    <div><span class="dot" style="background:#4caf7d"></span>Database</div>
-    <div><span class="dot" style="background:#c98a3e"></span>Load Balancer</div>
-    <div><span class="dot" style="background:#8b95a1"></span>Server</div>
-    <div><span class="dot" style="background:#a06fd1"></span>Storage</div>
-    <div class="section-title">Relationship</div>
-    <div><span class="line" style="border-top-style:solid"></span>depends_on</div>
-    <div><span class="line" style="border-top-style:dashed"></span>connects_to</div>
-    <div><span class="line" style="border-top-style:solid;border-color:#c98a3e"></span>routes_to</div>
-    <div><span class="line" style="border-top-style:dotted"></span>inherits_from</div>
+  <div class="main">
+    <div id="graphArea">
+      <div id="graph"></div>
+      <div id="status">Loading graph...</div>
+      <div id="legend">
+        <div class="section-title">Node type</div>
+        <div><span class="dot" style="background:#4f8cff"></span>Application</div>
+        <div><span class="dot" style="background:#4caf7d"></span>Database</div>
+        <div><span class="dot" style="background:#c98a3e"></span>Load Balancer</div>
+        <div><span class="dot" style="background:#8b95a1"></span>Server</div>
+        <div><span class="dot" style="background:#a06fd1"></span>Storage</div>
+        <div class="section-title">Relationship</div>
+        <div><span class="line" style="border-top-style:solid"></span>depends_on</div>
+        <div><span class="line" style="border-top-style:dashed"></span>connects_to</div>
+        <div><span class="line" style="border-top-style:solid;border-color:#c98a3e"></span>routes_to</div>
+        <div><span class="line" style="border-top-style:dotted"></span>inherits_from</div>
+      </div>
+    </div>
+    <aside id="sidebar">
+      <div id="sidebarButtons">
+        <button id="discoverBtn">Run Discovery</button>
+        <button id="agenticBtn">Run Discovery (Agentic)</button>
+      </div>
+      <div id="logPanel">
+        <div class="section-title">Discovery Log</div>
+        <div id="logEntries">No runs yet</div>
+      </div>
+    </aside>
   </div>
 
   <script>
