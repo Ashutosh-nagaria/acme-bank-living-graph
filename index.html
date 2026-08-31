@@ -207,6 +207,7 @@
         nodes = new vis.DataSet(data.nodes.map(n => ({
           id: n.id,
           label: n.label,
+          group: n.group,
           shape: "dot",
           size: 16,
           color: nodeColorFor(n.group),
@@ -217,6 +218,7 @@
           id: e.id,
           from: e.from,
           to: e.to,
+          relType: e.label,
           arrows: "to",
           dashes: edgeDash[e.label] ?? false,
           color: edgeColorFor(e.label),
@@ -241,12 +243,70 @@
           edges: { width: 1.5 }
         });
 
+        network.on("click", params => {
+          if (params.nodes.length > 0) {
+            highlightBlastRadius(params.nodes[0]);
+          } else {
+            clearBlastRadius();
+          }
+        });
+
         statusEl.textContent = data.nodes.length + " assets, " + data.edges.length + " relationships";
         setTimeout(() => { statusEl.style.display = "none"; }, 2500);
       } catch (err) {
         statusEl.textContent = "Failed to load graph: " + err.message;
         console.error(err);
       }
+    }
+
+    function blastRadiusAncestors(clickedId) {
+      const reverseAdj = {};
+      edges.get().forEach(e => {
+        if (!reverseAdj[e.to]) reverseAdj[e.to] = [];
+        reverseAdj[e.to].push(e.from);
+      });
+
+      const affected = new Set([clickedId]);
+      const queue = [clickedId];
+      while (queue.length) {
+        const current = queue.shift();
+        (reverseAdj[current] || []).forEach(parentId => {
+          if (!affected.has(parentId)) {
+            affected.add(parentId);
+            queue.push(parentId);
+          }
+        });
+      }
+      return affected;
+    }
+
+    function highlightBlastRadius(clickedId) {
+      const affected = blastRadiusAncestors(clickedId);
+
+      nodes.update(nodes.getIds().map(id => ({
+        id,
+        opacity: affected.has(id) ? 1 : 0.15
+      })));
+
+      edges.update(edges.getIds().map(id => {
+        const e = edges.get(id);
+        const inBlast = affected.has(e.from) && affected.has(e.to);
+        return {
+          id,
+          color: inBlast
+            ? { color: "#ff5f56", opacity: 1 }
+            : { color: edgeColorFor(e.relType).color, opacity: 0.1 },
+          width: inBlast ? 2.5 : 1.5
+        };
+      }));
+    }
+
+    function clearBlastRadius() {
+      nodes.update(nodes.getIds().map(id => ({ id, opacity: 1 })));
+      edges.update(edges.getIds().map(id => {
+        const e = edges.get(id);
+        return { id, color: edgeColorFor(e.relType), width: 1.5 };
+      }));
     }
 
     loadGraph();
@@ -263,6 +323,7 @@
           nodes.add({
             id: data.node.id,
             label: data.node.label,
+            group: data.node.group,
             shape: "dot",
             size: 16,
             color: nodeColorFor(data.node.group),
@@ -272,6 +333,7 @@
             id: data.edge.id,
             from: data.edge.from,
             to: data.edge.to,
+            relType: data.edge.label,
             arrows: "to",
             dashes: edgeDash[data.edge.label] ?? false,
             color: edgeColorFor(data.edge.label),
@@ -303,11 +365,7 @@
           const n = nodes.get(id);
           return {
             id,
-            color: nodeColorFor(n.color.background === groupColors.Application ? "Application"
-              : n.color.background === groupColors.Database ? "Database"
-              : n.color.background === groupColors.LoadBalancer ? "LoadBalancer"
-              : n.color.background === groupColors.Server ? "Server"
-              : "Storage"),
+            color: nodeColorFor(n.group),
             font: { color: themeColors[currentTheme].nodeFont, size: 12 }
           };
         });
@@ -315,8 +373,7 @@
 
         const edgeUpdates = edges.getIds().map(id => {
           const e = edges.get(id);
-          const isRoute = Array.isArray(e.dashes) ? false : (e.color && e.color.color === themeColors.dark.routeColor);
-          return { id, color: { color: isRoute ? themeColors[currentTheme].routeColor : themeColors[currentTheme].edgeColor, opacity: 0.7 } };
+          return { id, color: edgeColorFor(e.relType) };
         });
         edges.update(edgeUpdates);
       }
