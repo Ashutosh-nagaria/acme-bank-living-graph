@@ -23,8 +23,8 @@ export default async (req: Request, context: Context) => {
 
   try {
     const result = await session.run(`
-      MATCH (n)
-      OPTIONAL MATCH (n)-[r]->(m)
+      MATCH (n) WHERE NOT n:DiscoveryRun
+      OPTIONAL MATCH (n)-[r]->(m) WHERE NOT m:DiscoveryRun
       RETURN n, r, m
     `);
 
