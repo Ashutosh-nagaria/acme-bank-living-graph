@@ -128,6 +128,49 @@
     font-size: 13px;
     cursor: pointer;
   }
+  #logPanel {
+    position: absolute;
+    top: 84px;
+    right: 24px;
+    width: 340px;
+    max-height: 42vh;
+    overflow-y: auto;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-size: 12px;
+    z-index: 10;
+  }
+  #logPanel .section-title {
+    color: var(--muted);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 8px;
+  }
+  .logRun {
+    border-top: 1px solid var(--border);
+    padding: 8px 0;
+  }
+  .logRun:first-child {
+    border-top: none;
+    padding-top: 0;
+  }
+  .logRun .logTime {
+    color: var(--muted);
+    font-size: 11px;
+  }
+  .logRun .logCounts {
+    margin: 3px 0;
+    font-weight: 600;
+  }
+  .logRun .logConflict {
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.5;
+    margin-top: 2px;
+  }
 </style>
 </head>
 <body>
@@ -138,7 +181,11 @@
   </header>
   <div id="graph"></div>
   <div id="status">Loading graph...</div>
-  <button id="discoverBtn">Simulate Asset Discovery</button>
+  <button id="discoverBtn">Run Discovery</button>
+  <div id="logPanel">
+    <div class="section-title">Discovery Log</div>
+    <div id="logEntries">No runs yet</div>
+  </div>
   <div id="legend">
     <div class="section-title">Node type</div>
     <div><span class="dot" style="background:#4f8cff"></span>Application</div>
@@ -322,50 +369,87 @@
       }));
     }
 
+    function renderLog(runs) {
+      const logEntries = document.getElementById("logEntries");
+      if (!runs || runs.length === 0) {
+        logEntries.textContent = "No runs yet";
+        return;
+      }
+      logEntries.innerHTML = runs.map(run => {
+        const time = new Date(run.ranAt).toLocaleTimeString();
+        const conflictLines = run.conflicts.map(c =>
+          `• ${c.asset} — ${c.field}: ${c.detail} → resolved "${c.resolved}"`
+        ).join("<br>");
+        return `
+          <div class="logRun">
+            <div class="logTime">${time} · ${run.mode === "agentic" ? "agentic" : "non-agentic"}</div>
+            <div class="logCounts">+${run.newAssetCount} new, ${run.updatedAssetCount} updated, ${run.conflictCount} conflicts resolved</div>
+            <div class="logConflict">${conflictLines}</div>
+          </div>`;
+      }).join("");
+    }
+
+    async function loadLog() {
+      try {
+        const res = await fetch("/api/discovery-log");
+        if (!res.ok) return;
+        const data = await res.json();
+        renderLog(data.runs);
+      } catch (err) {
+        console.error("Failed to load discovery log", err);
+      }
+    }
+
     loadGraph();
+    loadLog();
 
     const discoverBtn = document.getElementById("discoverBtn");
     discoverBtn.addEventListener("click", async () => {
       discoverBtn.disabled = true;
+      discoverBtn.textContent = "Running discovery...";
       try {
-        const res = await fetch("/api/discover-asset");
+        const res = await fetch("/api/run-discovery");
         if (!res.ok) throw new Error("Request failed: " + res.status);
         const data = await res.json();
 
-        if (data.action === "added") {
+        data.newNodes.forEach(n => {
           nodes.add({
-            id: data.node.id,
-            label: data.node.label,
-            assetType: data.node.group,
+            id: n.id,
+            label: n.label,
+            assetType: n.group,
             shape: "dot",
             size: 26,
-            color: nodeColorFor(data.node.group),
+            color: nodeColorFor(n.group),
             font: { color: themeColors[currentTheme].nodeFont, size: 12 }
           });
+        });
+        data.newEdges.forEach(e => {
           edges.add({
-            id: data.edge.id,
-            from: data.edge.from,
-            to: data.edge.to,
-            relType: data.edge.label,
+            id: e.id,
+            from: e.from,
+            to: e.to,
+            relType: e.label,
             arrows: "to",
-            dashes: edgeDash[data.edge.label] ?? false,
-            color: edgeColorFor(data.edge.label),
+            dashes: edgeDash[e.label] ?? false,
+            color: edgeColorFor(e.label),
             smooth: { type: "continuous" }
           });
+        });
+
+        if (data.newNodes.length > 0) {
           network.setOptions({ physics: discoveryPhysics });
           setTimeout(() => {
             network.setOptions({ physics: defaultPhysics });
           }, 4500);
-          discoverBtn.textContent = "Remove Discovered Asset";
-        } else if (data.action === "removed") {
-          nodes.remove(data.nodeId);
-          discoverBtn.textContent = "Simulate Asset Discovery";
         }
+
+        await loadLog();
       } catch (err) {
         console.error(err);
-        alert("Discovery action failed: " + err.message);
+        alert("Discovery run failed: " + err.message);
       } finally {
         discoverBtn.disabled = false;
+        discoverBtn.textContent = "Run Discovery";
       }
     });
     const themeToggle = document.getElementById("themeToggle");
