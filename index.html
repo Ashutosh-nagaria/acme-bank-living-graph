@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Acme Bank — Living Infrastructure Graph</title>
+<title>Acme Bank: Living Infrastructure Graph</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.9/standalone/umd/vis-network.min.js"></script>
 <style>
   :root {
@@ -253,7 +253,7 @@
 <body>
   <header>
     <div class="headerTitle">
-      <h1>Acme Bank — Living Infrastructure Graph</h1>
+      <h1>Acme Bank: Living Infrastructure Graph</h1>
       <span>Discovery / CMDB visualization</span>
     </div>
     <button id="themeToggle">🌙 Dark</button>
@@ -489,7 +489,7 @@
 
         const conflictLines = run.conflicts.map(c => {
           if (c.rule === "retired") {
-            return `<div class="conflictLine">• ${c.asset} — retired: ${c.detail} → ${c.resolved}</div>`;
+            return `<div class="conflictLine">• ${c.asset}, retired: ${c.detail} → ${c.resolved}</div>`;
           }
           if (c.evidence) {
             investigationCounter++;
@@ -500,18 +500,18 @@
             const evidenceLines = c.evidence.map(e => `• ${e}`).join("<br>");
             return `
               <div class="conflictLine">
-                <div class="conflictSummary" data-target="${id}">• ${c.asset} — ${c.field}: recommendation <strong>${c.resolved}</strong> (confidence: ${c.confidence}) <span class="expandArrow">details ▾</span></div>
+                <div class="conflictSummary" data-target="${id}">• ${c.asset}, ${c.field}: recommendation <strong>${c.resolved}</strong> (confidence: ${c.confidence}) <span class="expandArrow">details ▾</span></div>
                 <div class="investigationDetail" id="${id}" style="display:none;">
                   <div class="invLabel">Conflict detected</div>
                   <div>${obsLines}</div>
                   <div class="invLabel">Evidence considered</div>
                   <div>${evidenceLines}</div>
                   <div class="invLabel">Recommendation</div>
-                  <div>${c.resolved} — confidence: ${c.confidence}</div>
+                  <div>${c.resolved} (confidence: ${c.confidence})</div>
                 </div>
               </div>`;
           }
-          return `<div class="conflictLine">• ${c.asset} — ${c.field}: rule applied: ${ruleLabel(c.rule)} → resolved "${c.resolved}"</div>`;
+          return `<div class="conflictLine">• ${c.asset}, ${c.field}: rule applied: ${ruleLabel(c.rule)} → resolved "${c.resolved}"</div>`;
         }).join("");
 
         const retiredPart = run.retiredAssetCount ? `, −${run.retiredAssetCount} retired` : "";

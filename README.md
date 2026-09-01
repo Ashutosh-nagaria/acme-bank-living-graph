@@ -1,4 +1,4 @@
-# Acme Bank — Living Infrastructure Graph
+# Acme Bank: Living Infrastructure Graph
 
 ![Netlify](https://img.shields.io/badge/deployed-netlify-00C7B7?style=flat-square)
 ![Neo4j](https://img.shields.io/badge/database-neo4j-018bff?style=flat-square)
