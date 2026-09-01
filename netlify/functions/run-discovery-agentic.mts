@@ -121,7 +121,7 @@ export default async (req: Request, context: Context) => {
     let decisions: any[] = [];
 
     if (rawConflicts.length > 0) {
-      const systemPrompt = `You are a CMDB reconciliation engine. You are given conflicting reports about IT infrastructure assets from two independent discovery sources. For each conflict, decide which source's value to trust and give a one-sentence reasoning grounded only in the evidence given (timestamps, which value is present vs missing, or general judgment about source reliability for that field). A null value means that source did not report anything for that field. Respond with ONLY a JSON array, no markdown formatting, no prose outside the array, in exactly this shape: [{"asset": string, "field": string, "trustedSource": string, "resolvedValue": string, "reasoning": string}]`;
+      const systemPrompt = `You are a CMDB reconciliation engine investigating conflicting reports about IT infrastructure assets from independent discovery sources. For each conflict, investigate the evidence given (timestamps, which value is present vs missing, prior known state if given, or general judgment about source reliability for that field) and produce a recommendation. Break your reasoning into 2 to 4 short, concrete evidence bullets, each under 12 words, stating a specific factor you weighed, not a restatement of the conflict itself. Assign a confidence level of "High", "Medium", or "Low" based on how clear-cut the evidence is. A null value means that source did not report anything for that field. Respond with ONLY a JSON array, no markdown formatting, no prose outside the array, in exactly this shape: [{"asset": string, "field": string, "trustedSource": string, "resolvedValue": string, "confidence": "High" | "Medium" | "Low", "evidence": string[]}]`;
 
       const apiResponse = await fetch("https://api.deepseek.com/chat/completions", {
         method: "POST",
@@ -163,14 +163,21 @@ export default async (req: Request, context: Context) => {
       const raw = rawConflicts.find(c => c.asset === candidate.name)!;
       const decision = findDecision(candidate.name, raw.field);
       const resolvedValue = decision ? decision.resolvedValue : (raw.sourceB.value ?? raw.sourceA.value);
-      const reasoning = decision ? decision.reasoning : "Model did not return a decision for this asset; defaulted to the second source.";
+      const evidence = decision && Array.isArray(decision.evidence) ? decision.evidence : ["Model did not return evidence for this asset; defaulted to the second source."];
+      const confidence = decision ? decision.confidence : "Low";
       const trustedSource = decision ? decision.trustedSource : raw.sourceB.name;
 
       conflicts.push({
         asset: candidate.name,
         field: raw.field,
-        rule: "agentic-judgment",
-        detail: `${raw.sourceA.name} reported "${raw.sourceA.value ?? "nothing"}", ${raw.sourceB.name} reported "${raw.sourceB.value ?? "nothing"}". The model trusted ${trustedSource}: ${reasoning}`,
+        rule: "agentic-investigation",
+        observations: [
+          { source: raw.sourceA.name, value: raw.sourceA.value, observedAt: raw.sourceA.observedAt },
+          { source: raw.sourceB.name, value: raw.sourceB.value, observedAt: raw.sourceB.observedAt }
+        ],
+        evidence,
+        trustedSource,
+        confidence,
         resolved: resolvedValue
       });
       newAssetNames.push(candidate.name);
@@ -210,14 +217,21 @@ export default async (req: Request, context: Context) => {
       const raw = rawConflicts.find(c => c.asset === asset.name)!;
       const decision = findDecision(asset.name, "last_patched");
       const resolvedValue = decision ? decision.resolvedValue : raw.sourceB.value;
-      const reasoning = decision ? decision.reasoning : "Model did not return a decision; defaulted to the source with a value present.";
+      const evidence = decision && Array.isArray(decision.evidence) ? decision.evidence : ["Model did not return evidence; defaulted to the source with a value present."];
+      const confidence = decision ? decision.confidence : "Low";
       const trustedSource = decision ? decision.trustedSource : raw.sourceB.name;
 
       conflicts.push({
         asset: asset.name,
         field: "last_patched",
-        rule: "agentic-judgment",
-        detail: `${raw.sourceA.name} reported "${raw.sourceA.value ?? "nothing"}", ${raw.sourceB.name} reported "${raw.sourceB.value ?? "nothing"}". The model trusted ${trustedSource}: ${reasoning}`,
+        rule: "agentic-investigation",
+        observations: [
+          { source: raw.sourceA.name, value: raw.sourceA.value, observedAt: raw.sourceA.observedAt },
+          { source: raw.sourceB.name, value: raw.sourceB.value, observedAt: raw.sourceB.observedAt }
+        ],
+        evidence,
+        trustedSource,
+        confidence,
         resolved: resolvedValue
       });
       updatedAssetNames.push(asset.name);

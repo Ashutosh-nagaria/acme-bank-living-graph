@@ -153,6 +153,20 @@
     opacity: 0.5;
     cursor: default;
   }
+  #modeCompare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    font-size: 10.5px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+  #modeCompare .modeCol strong {
+    display: block;
+    color: var(--text);
+    font-size: 11px;
+    margin-bottom: 3px;
+  }
   #themeToggle {
     background: var(--bg);
     border: 1px solid var(--border);
@@ -196,7 +210,43 @@
     color: var(--muted);
     font-size: 11px;
     line-height: 1.5;
+    margin-top: 6px;
+  }
+  .logModeSummary {
+    font-size: 11px;
+    color: var(--muted);
+    font-style: italic;
     margin-top: 2px;
+  }
+  .conflictLine {
+    margin-bottom: 6px;
+  }
+  .conflictSummary {
+    cursor: pointer;
+  }
+  .conflictSummary:hover {
+    color: var(--text);
+  }
+  .expandArrow {
+    color: var(--muted);
+    font-size: 10px;
+  }
+  .investigationDetail {
+    margin: 6px 0 4px 12px;
+    padding: 8px 10px;
+    border-left: 2px solid var(--border);
+    background: var(--bg);
+    border-radius: 4px;
+  }
+  .invLabel {
+    color: var(--muted);
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 6px 0 2px 0;
+  }
+  .invLabel:first-child {
+    margin-top: 0;
   }
 </style>
 </head>
@@ -229,6 +279,10 @@
     <aside id="sidebar">
       <div id="sidebarButtons">
         <button id="discoverBtn">Run Discovery</button>
+        <div id="modeCompare">
+          <div class="modeCol"><strong>Deterministic</strong>Rule-based · fast · predictable · low cost · best for routine conflicts</div>
+          <div class="modeCol"><strong>Agentic</strong>Investigates evidence · reasons across signals · higher cost · best for ambiguous conflicts</div>
+        </div>
         <button id="agenticBtn">Run Discovery (Agentic)</button>
       </div>
       <div id="logPanel">
@@ -407,6 +461,22 @@
       }));
     }
 
+    function timeAgo(iso) {
+      const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+      if (mins < 60) return mins + " min ago";
+      return Math.round(mins / 60) + " hr ago";
+    }
+
+    function ruleLabel(rule) {
+      const labels = {
+        "most-recent-observation-wins": "most recent observation wins",
+        "fill-gap-from-available-source": "filled gap from available source"
+      };
+      return labels[rule] || rule;
+    }
+
+    let investigationCounter = 0;
+
     function renderLog(runs) {
       const logEntries = document.getElementById("logEntries");
       if (!runs || runs.length === 0) {
@@ -415,18 +485,61 @@
       }
       logEntries.innerHTML = runs.map(run => {
         const time = new Date(run.ranAt).toLocaleTimeString();
-        const conflictLines = run.conflicts.map(c =>
-          `• ${c.asset} — ${c.field}: ${c.detail} → resolved "${c.resolved}"`
-        ).join("<br>");
+        const isAgentic = run.mode === "agentic";
+
+        const conflictLines = run.conflicts.map(c => {
+          if (c.rule === "retired") {
+            return `<div class="conflictLine">• ${c.asset} — retired: ${c.detail} → ${c.resolved}</div>`;
+          }
+          if (c.evidence) {
+            investigationCounter++;
+            const id = "inv-" + investigationCounter;
+            const obsLines = (c.observations || []).map(o =>
+              `${o.source}: ${o.value ?? "nothing reported"} (${timeAgo(o.observedAt)})`
+            ).join("<br>");
+            const evidenceLines = c.evidence.map(e => `• ${e}`).join("<br>");
+            return `
+              <div class="conflictLine">
+                <div class="conflictSummary" data-target="${id}">• ${c.asset} — ${c.field}: recommendation <strong>${c.resolved}</strong> (confidence: ${c.confidence}) <span class="expandArrow">details ▾</span></div>
+                <div class="investigationDetail" id="${id}" style="display:none;">
+                  <div class="invLabel">Conflict detected</div>
+                  <div>${obsLines}</div>
+                  <div class="invLabel">Evidence considered</div>
+                  <div>${evidenceLines}</div>
+                  <div class="invLabel">Recommendation</div>
+                  <div>${c.resolved} — confidence: ${c.confidence}</div>
+                </div>
+              </div>`;
+          }
+          return `<div class="conflictLine">• ${c.asset} — ${c.field}: rule applied: ${ruleLabel(c.rule)} → resolved "${c.resolved}"</div>`;
+        }).join("");
+
         const retiredPart = run.retiredAssetCount ? `, −${run.retiredAssetCount} retired` : "";
+        let modeSummary;
+        if (isAgentic) {
+          const signalCount = run.conflicts.filter(c => c.evidence).reduce((sum, c) => sum + c.evidence.length, 0);
+          modeSummary = signalCount > 0 ? `Evidence signals considered: ${signalCount}` : "";
+        } else {
+          const rulesUsed = [...new Set(run.conflicts.filter(c => c.rule && c.rule !== "retired").map(c => ruleLabel(c.rule)))];
+          modeSummary = rulesUsed.length > 0 ? `Rule applied: ${rulesUsed.join(", ")}` : "";
+        }
+
         return `
           <div class="logRun">
-            <div class="logTime">${time} · ${run.mode === "agentic" ? "agentic" : "non-agentic"}</div>
+            <div class="logTime">${time} · ${isAgentic ? "agentic" : "non-agentic"}</div>
             <div class="logCounts">+${run.newAssetCount} new${retiredPart}, ${run.updatedAssetCount} updated, ${run.conflictCount} conflicts resolved</div>
+            ${modeSummary ? `<div class="logModeSummary">${modeSummary}</div>` : ""}
             <div class="logConflict">${conflictLines}</div>
           </div>`;
       }).join("");
     }
+
+    document.getElementById("logEntries").addEventListener("click", (e) => {
+      const summary = e.target.closest(".conflictSummary");
+      if (!summary) return;
+      const target = document.getElementById(summary.dataset.target);
+      if (target) target.style.display = target.style.display === "none" ? "block" : "none";
+    });
 
     async function loadLog() {
       try {
